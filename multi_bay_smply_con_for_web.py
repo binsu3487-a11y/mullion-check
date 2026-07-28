@@ -403,7 +403,7 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         ax1.set_ylim(y_min - total_H * 0.1, y_max + total_H * 0.1)
         ax1.grid(True, linestyle="--", alpha=0.3)
 
-# --- 圖2：放大變形圖 ---
+        # --- 圖2：放大變形圖 ---
         target_defo_w = total_H * 0.15
         max_abs_disp = abs(max_disp)
         sfac_defo = target_defo_w / max_abs_disp if max_abs_disp > 1e-5 else 1.0
@@ -462,18 +462,18 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         ax4.set_xlim(-target_w * 1.5, target_w * 1.5)              
         ax4.set_ylim(y_min - total_H * 0.1, y_max + total_H * 0.1) 
         ax4.grid(True, linestyle="--", alpha=0.3)
-    for fig in (fig1, fig2, fig3, fig4):
-                fig.tight_layout()
+        for fig in (fig1, fig2, fig3, fig4):
+                    fig.tight_layout()
 
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        st.pyplot(fig1)
-        st.pyplot(fig3)
-    with col_f2:
-        st.pyplot(fig2)
-        st.pyplot(fig4)
-                
-        plt.close('all')
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            st.pyplot(fig1)
+            st.pyplot(fig3)
+        with col_f2:
+            st.pyplot(fig2)
+            st.pyplot(fig4)
+                    
+            plt.close('all')
     with tab3:
         st.subheader("⚖️ 支承反力與水平力平衡")
         ops.reactions()
