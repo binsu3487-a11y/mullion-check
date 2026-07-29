@@ -9,6 +9,7 @@ import matplotlib.ticker as ticker
 import io
 import docx
 from docx.shared import Inches
+import os
 
 # ============================================================
 # 1. 固定設定與共用函式
