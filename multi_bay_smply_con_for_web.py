@@ -45,10 +45,26 @@ st.title("🏗️ 帷幕牆多跨直料風力、強軸應力與容許變形檢�
 # --- 左側輸入區 ---
 st.sidebar.header("📝 1. 結構與載重參數")
 
-# ====== 新增：案件名稱輸入框 ======
+# ====== 案件名稱輸入框 ======
 project_name = st.sidebar.text_input("案件名稱 (選填，用於匯出檔名)", placeholder="例如：A棟3樓陽台直料")
 # ==================================
-w = st.sidebar.number_input("風力線載重 w (kgf/cm, >0)", min_value=0.001, value=1.5, format="%.4f")
+
+# ====== 載重輸入方式 ======
+load_input_method = st.sidebar.radio(
+    "風力載重輸入方式",
+    options=["直接輸入線載重", "由風壓與間距計算"]
+)
+
+if load_input_method == "直接輸入線載重":
+    w = st.sidebar.number_input("風力線載重 w (kgf/cm, >0)", min_value=0.001, value=1.5, format="%.4f")
+else:
+    p_kpa = st.sidebar.number_input("設計風壓 P (kPa)", min_value=0.01, value=2.50, format="%.2f")
+    spacing_cm = st.sidebar.number_input("直料受風寬度 B (cm)", min_value=1.0, value=120.0, format="%.1f")
+    
+    # 單位換算公式：w = P * B / 98.1
+    w = (p_kpa * spacing_cm) / 98.1
+    st.sidebar.info(f"💡 自動換算線載重：\n**w = {w:.3f} kgf/cm**")
+# ==================================
 
 # 懸臂與跨度動態輸入
 add_bottom = st.sidebar.checkbox("增加下部懸臂", value=True)
@@ -521,7 +537,7 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
     # 1. 整理要匯出的資料
     input_summary = pd.DataFrame({
         "參數名稱": ["風力線載重 w (kgf/cm)", "下部懸臂 a (cm)", "支承間距 L (cm)", "頂部懸臂 b (cm)", "選擇材料", "總面積 A (cm^2)", "總慣性矩 Ix (cm^4)"],
-        "數值": [w, bottom_cantilever_length, str(span_lengths), top_cantilever_length, mat['name'], Area_mullion, I_mullion]
+        "數值": [f"{w:.3f}", bottom_cantilever_length, str(span_lengths), top_cantilever_length, mat['name'], Area_mullion, I_mullion]
     })
     df_export_stress = pd.DataFrame(stress_results).drop(columns=["passed"])
     df_export_disp = df_disp.drop(columns=["passed"]) if "passed" in df_disp.columns else df_disp
@@ -529,7 +545,7 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
     # 2. 開始建立 Word 文件
     doc = docx.Document()
     doc.add_heading('帷幕牆直料檢核分析報告', 0)
-    
+
     # 3. 寫入輸入參數
     doc.add_heading('一、 輸入參數', level=1)
     for idx, row in input_summary.iterrows():
