@@ -1,11 +1,7 @@
 streamlit
-
 openseespy
-
 opsvis
-
 numpy
-
 pandas
-
 matplotlib
+xlsxwriter
