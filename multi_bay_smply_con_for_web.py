@@ -42,6 +42,23 @@ def span_allowable_deflection(length_cm):
 st.set_page_config(page_title="多跨度直料檢核系統", layout="wide")
 st.title("🏗️ 帷幕牆多跨直料風力、強軸應力與容許變形檢核")
 
+# ====== 顯示結構示意圖 ======
+try:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    img_path = os.path.join(current_dir, "structure_FBD.png")
+    
+    # 這裡將主畫面切成三個區塊 (比例 1 : 1 : 1)
+    # 把圖片放在中間 (col2)，這樣長條圖就不會變得太巨大，並且能保持置中
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col2:
+        st.image(img_path, caption="多跨直料結構示意圖")
+        
+except Exception as e:
+    # 注意：主畫面的警告要把 .sidebar 拿掉，直接用 st.warning
+    st.warning("找不到示意圖，請確認圖片 (structure_FBD.png) 是否與程式碼放在同一資料夾內。")
+# ==================================================
+
 # --- 左側輸入區 ---
 st.sidebar.header("📝 1. 結構與載重參數")
 
