@@ -6,6 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
+import io
+import docx
+from docx.shared import Inches
 
 # ============================================================
 # 1. 固定設定與共用函式
@@ -20,7 +23,8 @@ MATERIALS = {
     2: {"name": "鋁合金 6061-T6", "E": 710100.0, "Fty": 2450.0, "Ftu": 2660.0, "Fb_allow": 1485.0},
     3: {"name": "鋁合金 6063-T5", "E": 710100.0, "Fty": 1050.0, "Ftu": 1470.0, "Fb_allow": 682.0},
     4: {"name": "鋁合金 6063-T6", "E": 710100.0, "Fty": 1750.0, "Ftu": 2100.0, "Fb_allow": 1060.0},
-    5: {"name": "碳鋼 A36", "E": 2.04e6, "Fty": 2530.0, "Ftu": 4100.0, "Fb_allow": 1518.0},
+    5: {"name": "碳鋼 SS400 (範例)", "E": 2039000.0, "Fty": 2500.0, "Ftu": 4000.0, "Fb_allow": 1500.0},
+    6: {"name": "不鏽鋼 SUS304 (範例)", "E": 1968000.0, "Fty": 2100.0, "Ftu": 5300.0, "Fb_allow": 1260.0},
 }
 
 def status_text(passed):
@@ -40,6 +44,10 @@ st.title("🏗️ 帷幕牆多跨直料風力、強軸應力與容許變形檢�
 
 # --- 左側輸入區 ---
 st.sidebar.header("📝 1. 結構與載重參數")
+
+# ====== 新增：案件名稱輸入框 ======
+project_name = st.sidebar.text_input("案件名稱 (選填，用於匯出檔名)", placeholder="例如：A棟3樓陽台直料")
+# ==================================
 w = st.sidebar.number_input("風力線載重 w (kgf/cm, >0)", min_value=0.001, value=1.5, format="%.4f")
 
 # 懸臂與跨度動態輸入
@@ -306,8 +314,8 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         fb = moment_share / profile["Sx"]
         utilization = fb / mat["Fb_allow"]
         stress_results.append({
-            "斷面名稱": profile["name"], "Ix (cm^4)": f"{profile['Ix']:.4f}", "Sx (cm^3)": f"{profile['Sx']:.4f}",
-            "分配彎矩 (kgf-cm)": f"{moment_share:.4f}", "撓曲應力 fb": f"{fb:.4f}", "使用率": f"{utilization:.4f}",
+            "斷面名稱": profile["name"], "Ix (cm^4)": f"{profile['Ix']:.3f}", "Sx (cm^3)": f"{profile['Sx']:.3f}",
+            "分配彎矩 (kgf-cm)": f"{moment_share:.3f}", "撓曲應力 fb": f"{fb:.2f}", "使用率": f"{utilization:.3f}",
             "檢核結果": status_text(utilization <= 1.0), "passed": utilization <= 1.0
         })
 
@@ -329,8 +337,8 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         st.divider()
         st.subheader("1️⃣ 直料風力強軸應力檢核")
         st.write(f"**選用材料:** {mat['name']} (E={E_val:.0f}, Fty={mat['Fty']:.2f}, Ftu={mat['Ftu']:.2f}, 容許 Fb={mat['Fb_allow']:.2f} kgf/cm²)")
-        st.write(f"**總面積 A:** {Area_mullion:.4f} cm² | **總慣性矩 Ix:** {I_mullion:.4f} cm⁴")
-        st.write(f"**最大絕對彎矩 |M|:** {max_abs_moment:.4f} kgf-cm")
+        st.write(f"**總面積 A:** {Area_mullion:.3f} cm² | **總慣性矩 Ix:** {I_mullion:.3f} cm⁴")
+        st.write(f"**最大絕對彎矩 |M|:** {max_abs_moment:.3f} kgf-cm")
         df_stress = pd.DataFrame(stress_results).drop(columns=["passed"])
         st.dataframe(df_stress, use_container_width=True)
 
@@ -406,13 +414,13 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         target_defo_w = total_H * 0.15
         max_abs_disp = abs(max_disp)
         sfac_defo = target_defo_w / max_abs_disp if max_abs_disp > 1e-5 else 1.0
-        ax2.set_title(f"Deformed Shape\nMax |UX| = {max_abs_disp:.4f} cm")
+        ax2.set_title(f"Deformed Shape\nMax |UX| = {max_abs_disp:.3f} cm")
         opsv.plot_defo(sfac=sfac_defo, unDefoFlag=1, node_supports=True, ax=ax2)
         
         # 標示最大變形點
         ax2.plot(max_disp * sfac_defo, max_disp_y, marker="o", markersize=6, zorder=5)
         ax2.annotate(
-            f"Max |UX|\nUX={max_disp:.5f} cm\nY={max_disp_y:.2f} cm",
+            f"Max |UX|\nUX={max_disp:.3f} cm\nY={max_disp_y:.2f} cm",
             xy=(max_disp * sfac_defo, max_disp_y), xytext=(10, 8),
             textcoords="offset points", arrowprops={"arrowstyle": "->", "linewidth": 0.8},
             fontsize=9, bbox={"boxstyle": "round,pad=0.20", "facecolor": "white", "alpha": 0.85}
@@ -462,7 +470,7 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         ax4.set_ylim(y_min - total_H * 0.1, y_max + total_H * 0.1) 
         ax4.grid(True, linestyle="--", alpha=0.3)
         for fig in (fig1, fig2, fig3, fig4):
-                    fig.tight_layout()
+                fig.tight_layout()
 
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -471,8 +479,21 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         with col_f2:
             st.pyplot(fig2)
             st.pyplot(fig4)
-                    
-            plt.close('all')
+            
+        # ====== 新增：將 4 張圖片存入記憶體供 Word 使用 ======
+        img_fig1, img_fig2, img_fig3, img_fig4 = io.BytesIO(), io.BytesIO(), io.BytesIO(), io.BytesIO()
+        fig1.savefig(img_fig1, format='png', bbox_inches='tight')
+        fig2.savefig(img_fig2, format='png', bbox_inches='tight')
+        fig3.savefig(img_fig3, format='png', bbox_inches='tight')
+        fig4.savefig(img_fig4, format='png', bbox_inches='tight')
+        
+        # 將指針移回起點
+        for img in [img_fig1, img_fig2, img_fig3, img_fig4]:
+            img.seek(0)
+        # ====================================================
+        
+        plt.close('all')
+
     with tab3:
         st.subheader("⚖️ 支承反力與水平力平衡")
         ops.reactions()
@@ -490,6 +511,92 @@ if st.sidebar.button("🚀 執行檢核分析", type="primary"):
         external_force_x = w * total_height
         balance_error = sum_rx + external_force_x
         
-        st.write(f"- 風載總水平力: {external_force_x:.3f} kgf")
-        st.write(f"- 支承水平反力總和: {sum_rx:.3f} kgf")
-        st.write(f"- 水平力平衡誤差: {balance_error:.3e} kgf")
+        st.write(f"- 風載總水平力: {external_force_x:.2f} kgf")
+        st.write(f"- 支承水平反力總和: {sum_rx:.2f} kgf")
+        st.write(f"- 水平力平衡誤差: {balance_error:.2e} kgf")
+
+    # ============================================================
+    # 匯出資料 (Word) 功能
+    # ============================================================
+    # 1. 整理要匯出的資料
+    input_summary = pd.DataFrame({
+        "參數名稱": ["風力線載重 w (kgf/cm)", "下部懸臂 a (cm)", "支承間距 L (cm)", "頂部懸臂 b (cm)", "選擇材料", "總面積 A (cm^2)", "總慣性矩 Ix (cm^4)"],
+        "數值": [w, bottom_cantilever_length, str(span_lengths), top_cantilever_length, mat['name'], Area_mullion, I_mullion]
+    })
+    df_export_stress = pd.DataFrame(stress_results).drop(columns=["passed"])
+    df_export_disp = df_disp.drop(columns=["passed"]) if "passed" in df_disp.columns else df_disp
+
+    # 2. 開始建立 Word 文件
+    doc = docx.Document()
+    doc.add_heading('帷幕牆直料檢核分析報告', 0)
+    
+    # 3. 寫入輸入參數
+    doc.add_heading('一、 輸入參數', level=1)
+    for idx, row in input_summary.iterrows():
+        doc.add_paragraph(f"• {row['參數名稱']}: {row['數值']}")
+        
+    # 4. 寫入表格的共用函式
+    def add_df_to_word(doc_obj, df):
+        t = doc_obj.add_table(rows=1, cols=len(df.columns))
+        t.style = 'Table Grid'
+        hdr_cells = t.rows[0].cells
+        
+        # 寫入標題列
+        for i, col in enumerate(df.columns):
+            hdr_cells[i].text = str(col)
+            
+        # 寫入資料列
+        for _, row in df.iterrows():
+            row_cells = t.add_row().cells
+            for i, val in enumerate(row):
+                # 判斷如果是浮點數 (小數)，就格式化為小數點後 3 位
+                if isinstance(val, (float, np.floating)):
+                    # 如果數值非常接近 0 (例如 e-10)，直接顯示 0.000
+                    if abs(val) < 1e-6:
+                        row_cells[i].text = "0.000"
+                    else:
+                        row_cells[i].text = f"{val:.3f}"
+                else:
+                    # 如果是文字或其他格式，就直接轉成字串
+                    row_cells[i].text = str(val)
+
+    # 寫入應力與變形表格
+    doc.add_heading('二、 應力檢核結果', level=1)
+    add_df_to_word(doc, df_export_stress)
+    
+    doc.add_heading('三、 變形檢核結果', level=1)
+    add_df_to_word(doc, df_export_disp)
+    
+    # ====== 新增：寫入支承反力數據 ======
+    doc.add_heading('四、 支承反力數據', level=1)
+    add_df_to_word(doc, df_react)
+    doc.add_paragraph(f"風載總水平力: {external_force_x:.2f} kgf")
+    doc.add_paragraph(f"支承水平反力總和: {sum_rx:.2f} kgf")
+    doc.add_paragraph(f"水平力平衡誤差: {balance_error:.2e} kgf")
+    # ==================================
+    
+    # 5. 寫入圖表
+    doc.add_heading('五、 結構與內力圖表', level=1)
+    doc.add_paragraph('【模型與實際變形圖】')
+    doc.add_picture(img_fig1, width=Inches(3))
+    doc.add_picture(img_fig2, width=Inches(3))
+    
+    doc.add_paragraph('【彎矩與剪力圖】')
+    doc.add_picture(img_fig3, width=Inches(3))
+    doc.add_picture(img_fig4, width=Inches(3))
+    
+    # 6. 存入記憶體並產生下載按鈕
+    word_output = io.BytesIO()
+    doc.save(word_output)
+    word_output.seek(0)
+    
+    # ======「檔名判斷」======
+    export_filename_base = project_name.strip() if project_name.strip() else "mullion_analysis_report"
+
+    st.sidebar.download_button(
+        label="📄 匯出 Word 分析報告",
+        data=word_output,
+        file_name=f"{export_filename_base}.docx",  # <--- 這裡換成自訂的變數
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        type="secondary"
+    )
