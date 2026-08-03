@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from io import BytesIO
 from typing import Dict, List, Optional, Sequence, Tuple
+from pathlib import Path
 import re
 
 
@@ -50,7 +51,11 @@ ELEMENTS_PER_INPUT_SEGMENT = 50
 POSTPROCESS_POINTS_PER_ELEMENT = 50
 COORDINATE_TOLERANCE = 1.0e-8
 KPA_CM_TO_KGF_PER_CM = 1.0 / 98.0665
-APP_VERSION = "2026.08.03-r5"
+APP_VERSION = "2026.08.03-r7"
+
+# Streamlit 網頁中的圖面顯示寬度；只影響網頁，不影響分析與下載檔。
+MODEL_DISPLAY_WIDTH_PX = 400
+DEFORMATION_DISPLAY_WIDTH_PX = 560
 WORD_FIGURE_HEIGHT_CM = 10.2
 
 # 材料資料庫：未來新增鋼材或其他材料時，可直接增加新的材料分類與牌號。
@@ -1294,8 +1299,8 @@ def run_analysis(
         "markersize": 0,
     }
 
-    fig1, ax1 = plt.subplots(figsize=(7, 10))
-    fig2, ax2 = plt.subplots(figsize=(7, 10))
+    fig1, ax1 = plt.subplots(figsize=(5.2, 7.4))
+    fig2, ax2 = plt.subplots(figsize=(5.2, 7.4))
     fig3, ax3 = plt.subplots(figsize=(7, 10))
     fig4, ax4 = plt.subplots(figsize=(7, 10))
 
@@ -1733,10 +1738,18 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
             st.subheader("模型圖")
             figures = result["figures"]
             assert isinstance(figures, dict)
-            st.pyplot(figures["model"], use_container_width=True)
+            model_png = figure_to_png_bytes(figures["model"])
+            model_space_left, model_image_col, model_space_right = st.columns(
+                [0.15, 1.0, 0.15]
+            )
+            with model_image_col:
+                st.image(
+                    model_png,
+                    width=MODEL_DISPLAY_WIDTH_PX,
+                )
             st.download_button(
                 "下載模型圖 PNG",
-                data=figure_to_png_bytes(figures["model"]),
+                data=model_png,
                 file_name="vertical_beam_model.png",
                 mime="image/png",
                 key="download_model_png",
@@ -1846,10 +1859,18 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
             tip_cols[1].metric("頂部懸臂端 UX", f"{float(upper_tip_ux):.3f} cm")
 
         st.subheader("變形圖")
-        st.pyplot(figures["deformation"], use_container_width=True)
+        deformation_png = figure_to_png_bytes(figures["deformation"])
+        defo_space_left, defo_image_col, defo_space_right = st.columns(
+            [1.0, 1.35, 1.0]
+        )
+        with defo_image_col:
+            st.image(
+                deformation_png,
+                width=DEFORMATION_DISPLAY_WIDTH_PX,
+            )
         st.download_button(
             "下載變形圖 PNG",
-            data=figure_to_png_bytes(figures["deformation"]),
+            data=deformation_png,
             file_name="deformed_shape.png",
             mime="image/png",
             key="download_defo_png",
@@ -1968,7 +1989,6 @@ def main() -> None:
     )
 
     st.title("直立多段梁／帷幕直料分析")
-    st.caption(f"程式版本：{APP_VERSION}")
     st.caption(
         "單位：kgf、cm。風載固定向右；"
         "Hinge 為鉸支承、Pin 為內部彎矩釋放、Free end 為自由端。"
@@ -1991,7 +2011,7 @@ def main() -> None:
     st.sidebar.header("載重、材料與斷面")
 
     report_name_input = st.sidebar.text_input(
-        "Word 報告檔名（可省略 .docx）",
+        "Word 報告檔名",
         value="",
         placeholder="mullion_analysis_report",
         help="未輸入時，預設使用 mullion_analysis_report.docx。",
@@ -2173,6 +2193,37 @@ def main() -> None:
     # 主畫面：幾何輸入
     # --------------------------------------------------------
     st.header("1. 控制點與各段長度")
+
+    st.subheader("輸入方式說明")
+    st.markdown(
+        """
+        <div style="font-size:1.05rem; line-height:1.85; margin-bottom:0.5rem;">
+          <div><strong>1.</strong> 輸入跨數（L 有幾段）</div>
+          <div><strong>2.</strong> 輸入最底部的支承形式，可能為鉸接（Hinge）或自由端（Free）</div>
+          <div><strong>3.</strong> 輸入各跨長度以及上部控制點的支承形式，可能為鉸接（Hinge）或內部鉸接（Pin）</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    diagram_path = (
+        Path(__file__).resolve().parent
+        / "assets"
+        / "struc_pic.png"
+    )
+    if diagram_path.exists():
+        diagram_col1, diagram_col2, diagram_col3 = st.columns([1, 0.72, 1])
+        with diagram_col2:
+            st.image(
+                str(diagram_path),
+                width=300,
+            )
+    else:
+        st.warning(
+            "找不到輸入示意圖：assets/mullion_input_diagram.png。"
+        )
+
+    st.divider()
 
     geometry_col1, geometry_col2 = st.columns([1, 1])
     with geometry_col1:
