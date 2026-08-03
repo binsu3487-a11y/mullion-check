@@ -2208,7 +2208,6 @@ def main() -> None:
 
     diagram_path = (
         Path(__file__).resolve().parent
-        / "assets"
         / "struc_pic.png"
     )
     if diagram_path.exists():
