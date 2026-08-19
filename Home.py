@@ -10,7 +10,6 @@ st.set_page_config(
 )
 
 st.title("帷幕牆結構分析")
-st.caption("直料與橫料分析整合於同一個 Streamlit 網站，兩套分析模型仍各自獨立。")
 
 st.markdown("### 選擇分析項目")
 
