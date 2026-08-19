@@ -908,9 +908,9 @@ def make_tributary_area_figure(
             ha="right", va="center", fontsize=9,
         )
 
-    draw_glass(upper_w, upper_h, 0.0, 1.0, "玻璃" if not has_lower else "上方玻璃")
+    draw_glass(upper_w, upper_h, 0.0, 1.0, "Glass" if not has_lower else "Upper Glass")
     if has_lower:
-        draw_glass(lower_w, lower_h, 0.0, -1.0, "下方玻璃")
+        draw_glass(lower_w, lower_h, 0.0, -1.0, "Lower Glass")
 
     ax.plot([0.0, L], [0.0, 0.0], color="blue", linewidth=3.0, zorder=7)
     support_h = max(0.05 * max_h, 3.0)
@@ -978,11 +978,11 @@ def make_tributary_load_figure(
 
     fig, ax = plt.subplots(figsize=(8.6, 4.5))
     ax.fill_between(x, 0.0, q_total, color="lightskyblue", alpha=0.42, zorder=1)
-    ax.plot(x, q_total, color="steelblue", linewidth=2.0, zorder=4, label="合成風載")
+    ax.plot(x, q_total, color="steelblue", linewidth=2.0, zorder=4, label="Combined Wind Load")
 
     if wind_glass_mode == "separate":
-        ax.plot(x, q_upper, linewidth=1.1, linestyle="--", alpha=0.8, label="上方玻璃")
-        ax.plot(x, q_lower, linewidth=1.1, linestyle=":", alpha=0.8, label="下方玻璃")
+        ax.plot(x, q_upper, linewidth=1.1, linestyle="--", alpha=0.8, label="Upper Glass Load")
+        ax.plot(x, q_lower, linewidth=1.1, linestyle=":", alpha=0.8, label="Lower Glass Load")
         ax.legend(loc="upper right", fontsize=8)
 
     if q_max > 1.0e-12:
@@ -1018,14 +1018,21 @@ def make_tributary_load_figure(
         ax.add_patch(tri)
         ax.text(x_support, -1.12 * support_h, label, ha="center", va="top", fontsize=9)
 
+    def figure_shape_text(width_cm: float, height_cm: float) -> str:
+        W = float(width_cm)
+        H = float(height_cm)
+        if np.isclose(W, H, rtol=0.0, atol=1.0e-9):
+            return "Triangular"
+        return "Trapezoidal" if W > H else "Triangular"
+
     if wind_glass_mode == "single":
-        load_text = f"{wind_load_shape_text(upper_width_cm, upper_height_cm)} wind load"
+        load_text = f"{figure_shape_text(upper_width_cm, upper_height_cm)} Wind Load"
     elif wind_glass_mode == "same_double":
-        load_text = f"{wind_load_shape_text(upper_width_cm, upper_height_cm)} wind load × 2"
+        load_text = f"{figure_shape_text(upper_width_cm, upper_height_cm)} Wind Load × 2"
     else:
-        upper_shape = wind_load_shape_text(upper_width_cm, upper_height_cm)
-        lower_shape = wind_load_shape_text(float(lower_width_cm), float(lower_height_cm))
-        load_text = f"Upper {upper_shape} + Lower {lower_shape}"
+        upper_shape = figure_shape_text(upper_width_cm, upper_height_cm)
+        lower_shape = figure_shape_text(float(lower_width_cm), float(lower_height_cm))
+        load_text = f"Upper: {upper_shape} + Lower: {lower_shape}"
 
     ax.text(
         0.02, 0.94,
