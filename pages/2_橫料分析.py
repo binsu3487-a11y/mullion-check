@@ -1755,8 +1755,23 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
     status_col3.metric("強軸風壓變形", "PASS" if bool(result["strong_deflection_pass"]) else "FAIL")
     status_col4.metric("弱軸自重變形", "PASS" if bool(result["weak_deflection_pass"]) else "FAIL")
 
-    tab_summary, tab_wind, tab_gravity, tab_tables, tab_report = st.tabs(
-        ["結果摘要", "強軸－風壓", "弱軸－自重", "數據表", "Word 報告"]
+    # Word 報告匯出位置與直料分析一致：放在主要結果區上方，不另開分頁。
+    if DOCX_IMPORT_ERROR is not None:
+        st.error("目前環境未安裝 python-docx，無法輸出 Word。")
+        st.code("python -m pip install python-docx", language="bash")
+    else:
+        report_bytes = build_word_report(result)
+        st.download_button(
+            "匯出所有數據與圖表的 Word 報告",
+            data=report_bytes,
+            file_name=sanitize_report_filename(report_name_input),
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+            key="download_transom_word_report",
+        )
+
+    tab_summary, tab_wind, tab_gravity = st.tabs(
+        ["結果摘要", "強軸－風壓", "弱軸－自重"]
     )
 
     with tab_summary:
@@ -1791,6 +1806,45 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
             use_container_width=True,
             hide_index=True,
         )
+
+        st.subheader("強軸與弱軸最大結果")
+        axis_df = pd.DataFrame(
+            [
+                {
+                    "方向": "強軸－風壓",
+                    "最大位移 (cm)": strong["max_abs_displacement"],
+                    "位移位置 X (cm)": strong["max_displacement_x"],
+                    "最大彎矩 (kgf-cm)": strong["max_abs_moment"],
+                    "彎矩位置 X (cm)": strong["max_moment_x"],
+                    "最大剪力 (kgf)": strong["max_abs_shear"],
+                    "剪力位置 X (cm)": strong["max_shear_x"],
+                },
+                {
+                    "方向": "弱軸－自重",
+                    "最大位移 (cm)": weak["max_abs_displacement"],
+                    "位移位置 X (cm)": weak["max_displacement_x"],
+                    "最大彎矩 (kgf-cm)": weak["max_abs_moment"],
+                    "彎矩位置 X (cm)": weak["max_moment_x"],
+                    "最大剪力 (kgf)": weak["max_abs_shear"],
+                    "剪力位置 X (cm)": weak["max_shear_x"],
+                },
+            ]
+        )
+        st.dataframe(
+            round_dataframe_for_display(axis_df),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        with st.expander("模型與輸入摘要"):
+            summary_df = pd.DataFrame(
+                [{"項目": key, "數值": value} for key, value in summary.items()]
+            )
+            st.dataframe(
+                round_dataframe_for_display(summary_df),
+                use_container_width=True,
+                hide_index=True,
+            )
 
         st.subheader("載重換算")
         load_rows = [
@@ -1850,6 +1904,14 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
                 hide_index=True,
             )
 
+        with st.expander("下載數據"):
+            render_dataframe_download(
+                axis_df,
+                "下載強軸與弱軸最大結果 CSV",
+                "transom_max_results.csv",
+                "download_axis_csv",
+            )
+
     with tab_wind:
         metric1, metric2, metric3 = st.columns(3)
         metric1.metric("最大強軸變形", f"{float(strong['max_abs_displacement']):.3f} cm")
@@ -1866,6 +1928,27 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
         st.pyplot(figures["strong_deformation"], use_container_width=False)
         st.pyplot(figures["strong_moment"], use_container_width=False)
         st.pyplot(figures["strong_shear"], use_container_width=False)
+
+        st.subheader("強軸支承反力")
+        strong_reaction_df = pd.DataFrame(
+            [
+                {
+                    "支承": "左支承",
+                    "反力 (kgf)": strong["left_reaction"],
+                    "位置 X (cm)": 0.0,
+                },
+                {
+                    "支承": "右支承",
+                    "反力 (kgf)": strong["right_reaction"],
+                    "位置 X (cm)": summary["橫料支承跨距 L (cm)"],
+                },
+            ]
+        )
+        st.dataframe(
+            round_dataframe_for_display(strong_reaction_df),
+            use_container_width=True,
+            hide_index=True,
+        )
 
     with tab_gravity:
         metric1, metric2, metric3 = st.columns(3)
@@ -1885,66 +1968,27 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
         st.pyplot(figures["weak_moment"], use_container_width=False)
         st.pyplot(figures["weak_shear"], use_container_width=False)
 
-    with tab_tables:
-        st.subheader("模型與輸入摘要")
-        summary_df = pd.DataFrame([{"項目": key, "數值": value} for key, value in summary.items()])
-        st.dataframe(round_dataframe_for_display(summary_df), use_container_width=True, hide_index=True)
-
-        st.subheader("強軸與弱軸最大結果")
-        axis_df = pd.DataFrame(
+        st.subheader("弱軸支承反力")
+        weak_reaction_df = pd.DataFrame(
             [
                 {
-                    "方向": "強軸－風壓",
-                    "最大位移 (cm)": strong["max_abs_displacement"],
-                    "位移位置 X (cm)": strong["max_displacement_x"],
-                    "最大彎矩 (kgf-cm)": strong["max_abs_moment"],
-                    "彎矩位置 X (cm)": strong["max_moment_x"],
-                    "最大剪力 (kgf)": strong["max_abs_shear"],
-                    "剪力位置 X (cm)": strong["max_shear_x"],
+                    "支承": "左支承",
+                    "反力 (kgf)": weak["left_reaction"],
+                    "位置 X (cm)": 0.0,
                 },
                 {
-                    "方向": "弱軸－自重",
-                    "最大位移 (cm)": weak["max_abs_displacement"],
-                    "位移位置 X (cm)": weak["max_displacement_x"],
-                    "最大彎矩 (kgf-cm)": weak["max_abs_moment"],
-                    "彎矩位置 X (cm)": weak["max_moment_x"],
-                    "最大剪力 (kgf)": weak["max_abs_shear"],
-                    "剪力位置 X (cm)": weak["max_shear_x"],
+                    "支承": "右支承",
+                    "反力 (kgf)": weak["right_reaction"],
+                    "位置 X (cm)": summary["橫料支承跨距 L (cm)"],
                 },
             ]
         )
-        st.dataframe(round_dataframe_for_display(axis_df), use_container_width=True, hide_index=True)
-
-        st.subheader("支承反力")
-        reaction_df = pd.DataFrame(
-            [
-                {"方向": "強軸－風壓", "支承": "左", "反力 (kgf)": strong["left_reaction"], "模型反力 (kgf)": strong["left_reaction_fe"]},
-                {"方向": "強軸－風壓", "支承": "右", "反力 (kgf)": strong["right_reaction"], "模型反力 (kgf)": strong["right_reaction_fe"]},
-                {"方向": "弱軸－自重", "支承": "左", "反力 (kgf)": weak["left_reaction"], "模型反力 (kgf)": weak["left_reaction_fe"]},
-                {"方向": "弱軸－自重", "支承": "右", "反力 (kgf)": weak["right_reaction"], "模型反力 (kgf)": weak["right_reaction_fe"]},
-            ]
+        st.dataframe(
+            round_dataframe_for_display(weak_reaction_df),
+            use_container_width=True,
+            hide_index=True,
         )
-        st.dataframe(round_dataframe_for_display(reaction_df), use_container_width=True, hide_index=True)
 
-        download_col1, download_col2 = st.columns(2)
-        with download_col1:
-            render_dataframe_download(axis_df, "下載最大結果 CSV", "transom_max_results.csv", "download_axis_csv")
-        with download_col2:
-            render_dataframe_download(reaction_df, "下載支承反力 CSV", "transom_reactions.csv", "download_reaction_csv")
-
-    with tab_report:
-        if DOCX_IMPORT_ERROR is not None:
-            st.error("目前環境未安裝 python-docx，無法輸出 Word。")
-            st.code("python -m pip install python-docx", language="bash")
-        else:
-            report_bytes = build_word_report(result)
-            st.download_button(
-                "下載完整 Word 分析報告",
-                data=report_bytes,
-                file_name=sanitize_report_filename(report_name_input),
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True,
-            )
 
 
 # ============================================================
