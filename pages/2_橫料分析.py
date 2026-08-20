@@ -43,7 +43,7 @@ else:
 # 1. 固定設定（kgf、cm）
 # ============================================================
 
-ELEMENT_COUNT = 40
+ELEMENT_COUNT = 100
 POSTPROCESS_POINTS_PER_ELEMENT = 41
 KPA_TO_KGF_PER_CM2 = 1.0 / 98.0665
 DEFAULT_GLASS_DENSITY_KG_M3 = 2500.0
@@ -1215,6 +1215,44 @@ def run_analysis(
     strong_response = strong_model["response"]
     assert isinstance(strong_response, dict)
 
+    # --------------------------------------------------------
+    # 風壓總力一致性檢查
+    # --------------------------------------------------------
+    # 理論連續 tributary line load 的總風力
+    wind_check_x = np.linspace(0.0, L, 10001)
+    wind_check_q = np.asarray(q_exact(wind_check_x), dtype=float)
+    exact_wind_total_check = trapezoid_integral(wind_check_q, wind_check_x)
+
+    # 實際離散後施加到 OpenSees 的總風力
+    applied_wind_total_check = float(strong_response["total_distributed_load"])
+
+    # OpenSees 左右支承反力合計
+    reaction_wind_total_check = (
+        float(strong_response["left_reaction"])
+        + float(strong_response["right_reaction"])
+    )
+
+    # 目前 tributary load 對跨中左右對稱，因此左右反力理論上各為總風力的一半。
+    expected_each_reaction = 0.5 * exact_wind_total_check
+
+    load_error = abs(applied_wind_total_check - exact_wind_total_check)
+    reaction_error = abs(reaction_wind_total_check - exact_wind_total_check)
+    wind_check_tolerance = max(1.0e-3, 1.0e-4 * max(exact_wind_total_check, 1.0))
+
+    if load_error > wind_check_tolerance:
+        raise RuntimeError(
+            "風壓離散載重與理論 Tributary Load 不一致："
+            f"理論總風力 = {exact_wind_total_check:.3f} kgf，"
+            f"OpenSees 施加總風力 = {applied_wind_total_check:.3f} kgf。"
+        )
+
+    if reaction_error > wind_check_tolerance:
+        raise RuntimeError(
+            "風壓支承反力與總風力不平衡："
+            f"左反力 + 右反力 = {reaction_wind_total_check:.3f} kgf，"
+            f"理論總風力 = {exact_wind_total_check:.3f} kgf。"
+        )
+
     weak_model = run_opensees_axis_model(
         axis_name="Weak Axis / Glass Self-weight",
         transom_length_cm=L,
@@ -1364,6 +1402,9 @@ def run_analysis(
             "下方最大 tributary width (cm)": lower_max_trib if wind_glass_mode != "single" else "-",
             "最大線載重 qmax (kgf/cm)": max_exact_q,
             "橫料總風力 (kgf)": exact_total_wind,
+            "OpenSees 施加總風力 (kgf)": applied_wind_total_check,
+            "風壓左右反力合計 (kgf)": reaction_wind_total_check,
+            "單側理論支承反力 (kgf)": expected_each_reaction,
             "玻璃總自重 (kgf)": glass_weight,
             "單一 setting block 集中力 (kgf)": point_load,
             "左 setting block X (cm)": left_block_x,
@@ -1766,7 +1807,6 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
             data=report_bytes,
             file_name=sanitize_report_filename(report_name_input),
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            type="primary",
             use_container_width=True,
             key="download_transom_word_report",
         )
@@ -1949,6 +1989,23 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
             round_dataframe_for_display(strong_reaction_df),
             use_container_width=True,
             hide_index=True,
+        )
+
+        strong_reaction_sum = (
+            float(strong["left_reaction"]) + float(strong["right_reaction"])
+        )
+        theoretical_total = float(summary["橫料總風力 (kgf)"])
+        balance_percent = (
+            abs(strong_reaction_sum - theoretical_total)
+            / theoretical_total
+            * 100.0
+            if theoretical_total > 1.0e-12
+            else 0.0
+        )
+        st.caption(
+            f"Wind load check: theoretical total = {theoretical_total:.3f} kgf ｜ "
+            f"reaction sum = {strong_reaction_sum:.3f} kgf ｜ "
+            f"error = {balance_percent:.3f}%"
         )
 
     with tab_gravity:
