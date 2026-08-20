@@ -1766,6 +1766,7 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
             data=report_bytes,
             file_name=sanitize_report_filename(report_name_input),
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            type="primary",
             use_container_width=True,
             key="download_transom_word_report",
         )
