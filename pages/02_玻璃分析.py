@@ -1309,6 +1309,7 @@ with word_download_placeholder:
         data=word_bytes,
         file_name=report_filename,
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        type= "primary",
         use_container_width=True,
     )
 
