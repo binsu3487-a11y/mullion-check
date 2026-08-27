@@ -834,17 +834,20 @@ st.markdown(
         max-width: 1400px;
     }
     .app-subtitle {
-        color: #6b7280;
+        color: var(--text-color);
+        opacity: .72;
         margin-top: -0.6rem;
         margin-bottom: 1.4rem;
     }
     .section-card {
+        color: var(--text-color);
         border: 1px solid rgba(128,128,128,.25);
         border-radius: 12px;
         padding: 1rem 1.1rem;
         margin-bottom: .9rem;
     }
     .section-heading {
+        color: var(--text-color);
         font-size: 1.08rem;
         font-weight: 700;
         margin-bottom: .6rem;
@@ -861,21 +864,26 @@ st.markdown(
         border-bottom: 0;
     }
     .result-name {
+        color: var(--text-color);
         font-weight: 600;
     }
     .result-value {
+        color: var(--text-color);
         text-align: right;
         font-variant-numeric: tabular-nums;
         font-weight: 700;
     }
     .result-unit {
-        color: #6b7280;
+        color: var(--text-color);
+        opacity: .72;
     }
     .excel-note {
         font-size: .86rem;
-        color: #6b7280;
+        color: var(--text-color);
+        opacity: .72;
     }
     .key-result-card {
+        color: var(--text-color);
         border: 2px solid #c89b2b;
         border-radius: 14px;
         padding: 1rem 1.1rem;
@@ -884,7 +892,7 @@ st.markdown(
     }
     .key-result-title {
         font-size: .92rem;
-        color: #ffffff !important;
+        color: var(--text-color) !important;
         margin-bottom: .45rem;
         font-weight: 700;
     }
@@ -893,11 +901,12 @@ st.markdown(
         line-height: 1.15;
         font-weight: 800;
         font-variant-numeric: tabular-nums;
-        color: #ffffff !important;
+        color: var(--text-color) !important;
     }
     .key-result-unit {
         font-size: .9rem;
-        color: #ffffff !important;
+        color: var(--text-color) !important;
+        opacity: .78;
         margin-top: .35rem;
     }
     </style>
@@ -1308,8 +1317,8 @@ with word_download_placeholder:
         label="匯出 Word 報告",
         data=word_bytes,
         file_name=report_filename,
+        type='primary',
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        type= "primary",
         use_container_width=True,
     )
 
