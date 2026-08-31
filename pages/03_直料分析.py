@@ -2070,6 +2070,12 @@ def main() -> None:
         )
         w = float(wind_pressure) * float(tributary_width) * KPA_CM_TO_KGF_PER_CM
         st.sidebar.info(f"換算風力線載重 w = {w:.3f} kgf/cm")
+        st.sidebar.caption(
+            "單位換算：kgf/m² = kPa × 1000 ÷ 9.81。"
+            f"例如：{float(wind_pressure):.3f} kPa ≈ "
+            f"{float(wind_pressure) * 1000.0 / 9.81:.3f} kgf/m²。"
+            "再乘受風寬度即可換算為線載重 kgf/cm。"
+        )
         load_metadata = {
             "風載輸入方式": "風壓＋受風寬度",
             "輸入風壓 p (kPa)": float(wind_pressure),
@@ -2206,42 +2212,6 @@ def main() -> None:
     # --------------------------------------------------------
     # 主畫面：幾何輸入
     # --------------------------------------------------------
-    st.subheader("💡 設計參考：各跨度所需之最小慣性矩 (Ix)")
-    
-    st.info(
-        "此表格以**單跨簡支梁**承受目前設定之均布風載計算，提供初步選料參考。\n\n"
-        "計算公式為：$\\Delta = \\frac{5wL^4}{384EI}$，並反推在滿足容許變形量 $\\Delta_{\\text{allow}}$ 下所需的最小 $I$ 值。"
-    )
-    
-    reference_data = []
-    e_val = float(selected_material["E"])
-    
-    # 建立 300cm 到 500cm，每隔 50cm 的跨度清單
-    for ref_L in range(300, 550, 50):
-        allow_disp, formula = span_allowable_deflection(ref_L)
-        
-        # 反推所需最小 Ix
-        req_I = (5.0 * w * (ref_L ** 4)) / (384.0 * e_val * allow_disp)
-        
-        reference_data.append({
-            "跨度 L (cm)": ref_L,
-            "容許公式": formula,
-            "容許變形 (cm)": allow_disp,
-            "所需最小 Ix (cm⁴)": req_I
-        })
-        
-    ref_df = pd.DataFrame(reference_data)
-    st.dataframe(
-        ref_df.style.format({
-            "容許變形 (cm)": "{:.3f}",
-            "所需最小 Ix (cm⁴)": "{:.2f}"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
-        
-    st.divider()
-
     st.header("1. 控制點與各段長度")
 
     st.subheader("輸入方式說明")
