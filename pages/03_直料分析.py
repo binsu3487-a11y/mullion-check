@@ -251,6 +251,31 @@ def span_allowable_deflection(length_cm: float) -> Tuple[float, str]:
     return length_cm / 240.0 + 0.635, "L/240 + 0.635 cm"
 
 
+def recommended_ix_for_simple_span(
+    uniform_load_kgf_per_cm: float,
+    span_length_cm: float,
+    elastic_modulus_kgf_cm2: float,
+) -> Tuple[float, float, str]:
+    """以全跨均布載重簡支梁反算滿足容許變形所需的最低 Ix。
+
+    簡支梁均布載重最大變形：
+        delta_max = 5 w L^4 / (384 E I)
+
+    因此：
+        I_required = 5 w L^4 / (384 E delta_allow)
+    """
+    L = float(span_length_cm)
+    w_ref = float(uniform_load_kgf_per_cm)
+    E_ref = float(elastic_modulus_kgf_cm2)
+    allowable, formula = span_allowable_deflection(L)
+
+    if w_ref <= 0.0 or E_ref <= 0.0 or allowable <= 0.0:
+        return 0.0, allowable, formula
+
+    required_ix = 5.0 * w_ref * L**4 / (384.0 * E_ref * allowable)
+    return required_ix, allowable, formula
+
+
 def find_check_segment_key(
     y_mid: float,
     check_segments: Sequence[Dict[str, object]],
@@ -1221,6 +1246,24 @@ def run_analysis(
     deflection_pass = all(bool(item["passed"]) for item in span_check_results)
 
     # --------------------------------------------------------
+    # 變形控制之建議總 Ix
+    # --------------------------------------------------------
+    # 線彈性範圍內，在載重、E、幾何與支承條件固定時：
+    #     δ ∝ 1 / I
+    # 因此可由目前最大變形使用率反算滿足變形限制所需之總 Ix。
+    governing_deflection_utilization = max(
+        float(item["utilization"]) for item in span_check_results
+    )
+    recommended_ix_deflection = (
+        i_mullion * governing_deflection_utilization
+    )
+
+    governing_deflection_segment = max(
+        span_check_results,
+        key=lambda item: float(item["utilization"]),
+    )
+
+    # --------------------------------------------------------
     # 應力檢核
     # --------------------------------------------------------
     stress_results: List[Dict[str, object]] = []
@@ -1636,6 +1679,9 @@ def run_analysis(
         "deflection_pass": deflection_pass,
         "stress_pass": stress_pass,
         "overall_pass": overall_pass,
+        "recommended_ix_deflection": recommended_ix_deflection,
+        "governing_deflection_utilization": governing_deflection_utilization,
+        "governing_deflection_segment": str(governing_deflection_segment["name"]),
         "figures": {
             "model": fig1,
             "deformation": fig2,
@@ -1721,6 +1767,18 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
         "直料總高度",
         f"{float(summary['直料總高度 (cm)']):.3f} cm",
         None,
+    )
+
+    current_ix = float(summary["總 Ix (cm⁴)"])
+    recommended_ix = float(result["recommended_ix_deflection"])
+    governing_segment = str(result["governing_deflection_segment"])
+    governing_utilization = float(result["governing_deflection_utilization"])
+
+    st.info(
+        f"依實際模型反算 Ix（變形控制）≈ {recommended_ix:.3f} cm⁴ ｜ "
+        f"目前總 Ix = {current_ix:.3f} cm⁴ ｜ "
+        f"控制區段：{governing_segment} ｜ "
+        f"變形使用率 = {governing_utilization:.3f}"
     )
 
     report_filename = sanitize_report_filename(report_name_input)
@@ -1821,6 +1879,7 @@ def render_results(result: Dict[str, object], report_name_input: str) -> None:
         assert isinstance(figures, dict)
 
         st.subheader("各支承間距與懸臂變形檢核")
+
         span_df = pd.DataFrame(result["span_check_results"])[
             [
                 "name",
@@ -2208,6 +2267,47 @@ def main() -> None:
                 },
             ]
         )
+
+    # --------------------------------------------------------
+    # 主畫面最上方：簡支梁建議 Ix 參考表
+    # --------------------------------------------------------
+    st.header("建議 Ix 參考表")
+
+    reference_span_lengths = [300.0, 350.0, 400.0, 450.0, 500.0, 550.0, 600.0]
+    reference_e = float(selected_material["E"])
+
+    reference_rows = []
+    for reference_L in reference_span_lengths:
+        reference_ix, reference_allowable, reference_formula = (
+            recommended_ix_for_simple_span(
+                uniform_load_kgf_per_cm=float(w),
+                span_length_cm=reference_L,
+                elastic_modulus_kgf_cm2=reference_e,
+            )
+        )
+        reference_rows.append(
+            {
+                "簡支梁跨距 L (cm)": reference_L,
+                "容許變形": reference_formula,
+                "容許變形值 (cm)": reference_allowable,
+                "建議最低 Ix (cm⁴)": reference_ix,
+            }
+        )
+
+    reference_ix_df = pd.DataFrame(reference_rows)
+    st.dataframe(
+        round_dataframe_for_display(reference_ix_df),
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption(
+        f"參考條件：目前風力線載重 w = {float(w):.3f} kgf/cm，"
+        f"E = {reference_e:,.3f} kgf/cm²。"
+        "以單跨簡支梁承受全跨均布風載計算，並依各跨距之容許變形反算最低 Ix；"
+        "僅供斷面初選參考，不取代實際多跨／懸臂模型分析與應力檢核。"
+    )
+
+    st.divider()
 
     # --------------------------------------------------------
     # 主畫面：幾何輸入
