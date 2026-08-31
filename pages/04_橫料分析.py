@@ -2362,6 +2362,13 @@ def main() -> None:
             on_change=clear_analysis_result,
         )
 
+    st.caption(
+        "單位換算：kgf/m² = kPa × 1000 ÷ 9.81。"
+        f"例如：{float(wind_pressure_kpa):.3f} kPa ≈ "
+        f"{float(wind_pressure_kpa) * 1000.0 / 9.81:.3f} kgf/m²。"
+        "再乘 tributary width 即可換算為風力線載重 kgf/cm。"
+    )
+
     if SETTING_BLOCK_OPTIONS[setting_option] is None:
         setting_block_distance_cm = st.number_input(
             "Setting block 距支承距離 a (cm)",
@@ -2416,6 +2423,11 @@ def main() -> None:
     preview_col1.metric("玻璃總自重", f"{preview_weight:.3f} kgf")
     preview_col2.metric("每一集中載重 P", f"{preview_point:.3f} kgf")
     preview_col3.metric("最大風力線載重 qmax", f"{preview_qmax:.3f} kgf/cm")
+
+    st.caption(
+        "力單位提示：1 kgf = 9.807 N；"
+        "本工具內部結構分析統一使用 kgf、cm。"
+    )
 
     with st.expander("龜殼式 tributary area 的程式定義"):
         st.markdown(
