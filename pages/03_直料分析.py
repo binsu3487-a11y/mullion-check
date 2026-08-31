@@ -2206,6 +2206,42 @@ def main() -> None:
     # --------------------------------------------------------
     # 主畫面：幾何輸入
     # --------------------------------------------------------
+    st.subheader("💡 設計參考：各跨度所需之最小慣性矩 (Ix)")
+    
+    st.info(
+        "此表格以**單跨簡支梁**承受目前設定之均布風載計算，提供初步選料參考。\n\n"
+        "計算公式為：$\\Delta = \\frac{5wL^4}{384EI}$，並反推在滿足容許變形量 $\\Delta_{\\text{allow}}$ 下所需的最小 $I$ 值。"
+    )
+    
+    reference_data = []
+    e_val = float(selected_material["E"])
+    
+    # 建立 300cm 到 500cm，每隔 50cm 的跨度清單
+    for ref_L in range(300, 550, 50):
+        allow_disp, formula = span_allowable_deflection(ref_L)
+        
+        # 反推所需最小 Ix
+        req_I = (5.0 * w * (ref_L ** 4)) / (384.0 * e_val * allow_disp)
+        
+        reference_data.append({
+            "跨度 L (cm)": ref_L,
+            "容許公式": formula,
+            "容許變形 (cm)": allow_disp,
+            "所需最小 Ix (cm⁴)": req_I
+        })
+        
+    ref_df = pd.DataFrame(reference_data)
+    st.dataframe(
+        ref_df.style.format({
+            "容許變形 (cm)": "{:.3f}",
+            "所需最小 Ix (cm⁴)": "{:.2f}"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+        
+    st.divider()
+
     st.header("1. 控制點與各段長度")
 
     st.subheader("輸入方式說明")
